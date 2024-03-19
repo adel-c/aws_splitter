@@ -2,24 +2,23 @@ package main
 
 import (
 	"bufio"
-	"fmt"
 	"github.com/pkg/errors"
 	"io"
 	"os"
-	"strings"
+	"regexp"
 )
 
-func runCommand() error {
+func runCommand(files FileHandler) error {
 	if isInputFromPipe() {
 		printLog("data is from pipe")
-		return toUppercase(os.Stdin, os.Stdout)
+		return splitLine(files, os.Stdin)
 	} else {
 		file, e := getFile()
 		if e != nil {
 			return e
 		}
 		defer file.Close()
-		return toUppercase(file, os.Stdout)
+		return splitLine(files, file)
 	}
 }
 
@@ -43,14 +42,23 @@ func getFile() (*os.File, error) {
 	return file, nil
 }
 
-func toUppercase(r io.Reader, w io.Writer) error {
+func splitLine(files FileHandler, r io.Reader) error {
 	scanner := bufio.NewScanner(bufio.NewReader(r))
 	for scanner.Scan() {
-		_, e := fmt.Fprintln(
-			w, strings.ToUpper(scanner.Text()))
-		if e != nil {
-			return e
+		line := scanner.Text()
+		var log = parseLine("[^ ]+ (?P<fileName>[^ ]+) (?P<log>.*)", line)
+		printLog(log.file + "->" + log.line)
+		var outFile = files.GetFile(log.file)
+		_, err := outFile.WriteString(log.line + "\n")
+
+		if err != nil {
+			return err
 		}
+		errS := outFile.Sync()
+		if errS != nil {
+			return errS
+		}
+
 	}
 	return nil
 }
@@ -61,4 +69,29 @@ func fileExists(filepath string) bool {
 		return false
 	}
 	return !info.IsDir()
+}
+
+type LogLine struct {
+	file string
+	line string
+}
+
+func parseLine(regEx string, url string) LogLine {
+
+	var compRegEx = regexp.MustCompile(regEx)
+	match := compRegEx.FindStringSubmatch(url)
+	var log = LogLine{}
+
+	for i, name := range compRegEx.SubexpNames() {
+		if i > 0 && i <= len(match) {
+			if name == "fileName" {
+				log.file = match[i]
+			}
+			if name == "log" {
+				log.line = match[i]
+			}
+
+		}
+	}
+	return log
 }

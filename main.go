@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 	"log"
 	"os"
+	"path/filepath"
 )
 
 var rootCmd = &cobra.Command{
@@ -16,8 +17,53 @@ var rootCmd = &cobra.Command{
 		if flags.verbose {
 			printLog = logOut
 		}
-		return runCommand()
+		var files = FilesList{filesMap: map[string]*os.File{},
+			workDir: "/home/adel/projects/aws_splitter/work/",
+		}
+		err := runCommand(files)
+		files.Close()
+		return err
 	},
+}
+
+type FilesList struct {
+	filesMap map[string]*os.File
+	workDir  string
+}
+
+type FileHandler interface {
+	GetFile(s string) *os.File
+	Close()
+}
+
+func (r FilesList) Close() {
+	for s := range r.filesMap {
+		err := r.filesMap[s].Close()
+		if err != nil {
+			println(err)
+		}
+	}
+}
+func (r FilesList) GetFile(s string) *os.File {
+	var existingFile, ok = r.filesMap[s]
+	// If the key exists
+	if ok {
+		return existingFile
+	}
+
+	var path = filepath.Join(r.workDir, s)
+	var dir = filepath.Dir(path)
+	err := os.MkdirAll(dir, 0700)
+	if err != nil {
+		panic(err)
+	}
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		panic(err)
+	}
+	r.filesMap[s] = f
+	return f
+
 }
 
 var flags struct {
