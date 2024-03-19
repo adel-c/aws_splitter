@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 )
 
 var rootCmd = &cobra.Command{
@@ -18,17 +19,21 @@ var rootCmd = &cobra.Command{
 			printLog = logOut
 		}
 		var files = FilesList{filesMap: map[string]*os.File{},
-			workDir: "/home/adel/projects/aws_splitter/work/",
+			workDir:        flags.outDir,
+			truncateOnOpen: flags.clearOpen,
 		}
-		err := runCommand(files)
+
+		var compRegEx = regexp.MustCompile(flags.regex)
+		err := runCommand(files, compRegEx)
 		files.Close()
 		return err
 	},
 }
 
 type FilesList struct {
-	filesMap map[string]*os.File
-	workDir  string
+	filesMap       map[string]*os.File
+	workDir        string
+	truncateOnOpen bool
 }
 
 type FileHandler interface {
@@ -57,7 +62,12 @@ func (r FilesList) GetFile(s string) *os.File {
 	if err != nil {
 		panic(err)
 	}
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+
+	flag := os.O_WRONLY | os.O_CREATE | os.O_APPEND
+	if r.truncateOnOpen {
+		flag = os.O_TRUNC | os.O_CREATE | os.O_WRONLY
+	}
+	f, err := os.OpenFile(path, flag, 0600)
 	if err != nil {
 		panic(err)
 	}
@@ -67,16 +77,25 @@ func (r FilesList) GetFile(s string) *os.File {
 }
 
 var flags struct {
-	filepath string
-	verbose  bool
+	filepath  string
+	verbose   bool
+	regex     string
+	outDir    string
+	clearOpen bool
 }
 
 var flagsName = struct {
-	file, fileShort       string
-	verbose, verboseShort string
+	file, fileShort               string
+	verbose, verboseShort         string
+	regex, regexShort             string
+	outDir, outDirShort           string
+	clearOnOpen, clearOnOpenShort string
 }{
 	"file", "f",
 	"verbose", "v",
+	"regex", "r",
+	"outdir", "o",
+	"clear", "c",
 }
 
 var printLog func(s string)
@@ -87,12 +106,26 @@ func main() {
 		flagsName.file,
 		flagsName.fileShort,
 		"", "path to the file")
+	rootCmd.Flags().StringVarP(
+		&flags.regex,
+		flagsName.regex,
+		flagsName.regexShort,
+		"[^ ]+ (?P<fileName>[^ ]+) (?P<log>.*)", "line regex should have two named capture group 'fileName' and 'log'")
+	rootCmd.Flags().StringVarP(
+		&flags.outDir,
+		flagsName.outDir,
+		flagsName.outDirShort,
+		"./tmp", "out directory")
 	rootCmd.PersistentFlags().BoolVarP(
 		&flags.verbose,
 		flagsName.verbose,
 		flagsName.verboseShort,
 		false, "log verbose output")
-
+	rootCmd.PersistentFlags().BoolVarP(
+		&flags.clearOpen,
+		flagsName.clearOnOpen,
+		flagsName.clearOnOpenShort,
+		false, "clear each log file on open")
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)

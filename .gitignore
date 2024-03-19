@@ -21,3 +21,4 @@ main
 # Go workspace file
 go.work
 aws_splitter
+tmp

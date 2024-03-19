@@ -8,17 +8,17 @@ import (
 	"regexp"
 )
 
-func runCommand(files FileHandler) error {
+func runCommand(files FileHandler, regexp *regexp.Regexp) error {
 	if isInputFromPipe() {
 		printLog("data is from pipe")
-		return splitLine(files, os.Stdin)
+		return splitLine(files, os.Stdin, regexp)
 	} else {
 		file, e := getFile()
 		if e != nil {
 			return e
 		}
 		defer file.Close()
-		return splitLine(files, file)
+		return splitLine(files, file, regexp)
 	}
 }
 
@@ -42,11 +42,11 @@ func getFile() (*os.File, error) {
 	return file, nil
 }
 
-func splitLine(files FileHandler, r io.Reader) error {
+func splitLine(files FileHandler, r io.Reader, regexp *regexp.Regexp) error {
 	scanner := bufio.NewScanner(bufio.NewReader(r))
 	for scanner.Scan() {
 		line := scanner.Text()
-		var log = parseLine("[^ ]+ (?P<fileName>[^ ]+) (?P<log>.*)", line)
+		var log = parseLine(regexp, line)
 		printLog(log.file + "->" + log.line)
 		var outFile = files.GetFile(log.file)
 		_, err := outFile.WriteString(log.line + "\n")
@@ -76,9 +76,8 @@ type LogLine struct {
 	line string
 }
 
-func parseLine(regEx string, url string) LogLine {
+func parseLine(compRegEx *regexp.Regexp, url string) LogLine {
 
-	var compRegEx = regexp.MustCompile(regEx)
 	match := compRegEx.FindStringSubmatch(url)
 	var log = LogLine{}
 
