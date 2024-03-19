@@ -9,6 +9,7 @@ import (
 )
 
 func runCommand(files FileHandler, regexp *regexp.Regexp) error {
+
 	if isInputFromPipe() {
 		printLog("data is from pipe")
 		return splitLine(files, os.Stdin, regexp)
@@ -48,7 +49,7 @@ func splitLine(files FileHandler, r io.Reader, regexp *regexp.Regexp) error {
 		line := scanner.Text()
 		var log = parseLine(regexp, line)
 		printLog(log.file + "->" + log.line)
-		var outFile = files.GetFile(log.file)
+		var outFile = files.getFile(log.file)
 		_, err := outFile.WriteString(log.line + "\n")
 
 		if err != nil {

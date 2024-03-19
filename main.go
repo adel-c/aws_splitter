@@ -18,14 +18,15 @@ var rootCmd = &cobra.Command{
 		if flags.verbose {
 			printLog = logOut
 		}
-		var files = FilesList{filesMap: map[string]*os.File{},
+		var files = FilesList{
+			filesMap:       map[string]*os.File{},
 			workDir:        flags.outDir,
 			truncateOnOpen: flags.clearOpen,
 		}
 
 		var compRegEx = regexp.MustCompile(flags.regex)
 		err := runCommand(files, compRegEx)
-		files.Close()
+		closeAllFiles(files)
 		return err
 	},
 }
@@ -37,11 +38,10 @@ type FilesList struct {
 }
 
 type FileHandler interface {
-	GetFile(s string) *os.File
-	Close()
+	getFile(s string) *os.File
 }
 
-func (r FilesList) Close() {
+func closeAllFiles(r FilesList) {
 	for s := range r.filesMap {
 		err := r.filesMap[s].Close()
 		if err != nil {
@@ -49,7 +49,7 @@ func (r FilesList) Close() {
 		}
 	}
 }
-func (r FilesList) GetFile(s string) *os.File {
+func (r FilesList) getFile(s string) *os.File {
 	var existingFile, ok = r.filesMap[s]
 	// If the key exists
 	if ok {
