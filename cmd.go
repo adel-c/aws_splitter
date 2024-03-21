@@ -12,14 +12,14 @@ func runCommand(files FileHandler, regexp *regexp.Regexp) error {
 
 	if isInputFromPipe() {
 		printLog("data is from pipe")
-		return splitLine(files, os.Stdin, regexp)
+		return splitLine(files, os.Stdin, regexp, true)
 	} else {
 		file, e := getFile()
 		if e != nil {
 			return e
 		}
 		defer file.Close()
-		return splitLine(files, file, regexp)
+		return splitLine(files, file, regexp, false)
 	}
 }
 
@@ -43,7 +43,7 @@ func getFile() (*os.File, error) {
 	return file, nil
 }
 
-func splitLine(files FileHandler, r io.Reader, regexp *regexp.Regexp) error {
+func splitLine(files FileHandler, r io.Reader, regexp *regexp.Regexp, syncEachLine bool) error {
 	scanner := bufio.NewScanner(bufio.NewReader(r))
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -55,9 +55,11 @@ func splitLine(files FileHandler, r io.Reader, regexp *regexp.Regexp) error {
 		if err != nil {
 			return err
 		}
-		errS := outFile.Sync()
-		if errS != nil {
-			return errS
+		if syncEachLine {
+			errS := outFile.Sync()
+			if errS != nil {
+				return errS
+			}
 		}
 
 	}
